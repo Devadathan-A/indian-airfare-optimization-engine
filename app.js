@@ -1294,9 +1294,15 @@ function renderRouteMap(srcCode, dstCode) {
             attributionControl: false
         }).setView([22.5, 78.9], 5);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 18,
-            subdomains: 'abcd'
+        // ESRI World Dark Gray Canvas - Free, Commercial-grade, Zero Watermark
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 16,
+            attribution: 'Esri, HERE, Garmin, FAO, USGS, EPA'
+        }).addTo(routeMapInstance);
+
+        // ESRI Dark Gray Reference Layer for sharp boundary & coast labels
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 16
         }).addTo(routeMapInstance);
 
         routeLayersGroup = L.layerGroup().addTo(routeMapInstance);
