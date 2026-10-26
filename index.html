@@ -16,7 +16,7 @@
     <!-- Leaflet for Interactive Route Radar Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="style.css?v=2.2">
+    <link rel="stylesheet" href="style.css?v=2.3">
 </head>
 <body>
     <div class="app-container">
@@ -251,6 +251,7 @@
         <section id="tab-calendar" class="tab-content">
             <div class="section-title">📅 30-Day Forward Fare Trend (Cheapest Window)</div>
             <div class="section-desc">Daily lowest fares across upcoming 30 calendar days for your selected route:</div>
+            <div id="calendarInsightBox" class="insight-box">Loading 30-day forecast...</div>
             <div class="chart-container">
                 <canvas id="calendarChart"></canvas>
             </div>
@@ -260,6 +261,7 @@
         <section id="tab-hours" class="tab-content">
             <div class="section-title">⏰ Price Elasticity by Departure Time of Day</div>
             <div class="section-desc">Average spot fare distribution across 5 departure banks:</div>
+            <div id="hoursInsightBox" class="insight-box">Loading time elasticity model...</div>
             <div class="chart-container">
                 <canvas id="hoursChart"></canvas>
             </div>
@@ -374,6 +376,6 @@
     </div>
 
     <!-- Main Logic Script -->
-    <script src="app.js?v=2.2"></script>
+    <script src="app.js?v=2.3"></script>
 </body>
 </html>

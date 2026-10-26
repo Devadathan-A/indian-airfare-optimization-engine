@@ -410,13 +410,13 @@ let hoursChartInstance = null;
 let currentTripType = 'oneway';
 
 document.addEventListener('DOMContentLoaded', () => {
-    initAirportDropdowns();
-    initCurrentDate();
-    initTripTypeControls();
-    initWatchlistControls();
-    initDefaultSearch();
-    populateAirportsTable();
-    updateWatchlistBadge();
+    try { populateAirportsTable(); } catch (e) { console.error('Airports table init error:', e); }
+    try { initAirportDropdowns(); } catch (e) { console.error('Airport dropdowns init error:', e); }
+    try { initCurrentDate(); } catch (e) { console.error('Date init error:', e); }
+    try { initTripTypeControls(); } catch (e) { console.error('Trip type init error:', e); }
+    try { initWatchlistControls(); } catch (e) { console.error('Watchlist init error:', e); }
+    try { initDefaultSearch(); } catch (e) { console.error('Default search error:', e); }
+    try { updateWatchlistBadge(); } catch (e) { console.error('Watchlist badge error:', e); }
 });
 
 function initCurrentDate() {
@@ -1109,8 +1109,10 @@ function renderCalendarChart(srcCode, dstCode, cabinClass) {
     const minIndex = dataPoints.indexOf(minFare);
     const cheapestDayLabel = labels[minIndex];
 
-    document.getElementById('calendarInsightBox').innerHTML =
-        `💡 <b>Cheapest Day Ahead:</b> <b>${cheapestDayLabel}</b> with lowest fare starting from <b>₹${minFare.toLocaleString('en-IN')}</b>.`;
+    const calBox = document.getElementById('calendarInsightBox');
+    if (calBox) {
+        calBox.innerHTML = `💡 <b>Cheapest Day Ahead:</b> <b>${cheapestDayLabel}</b> with lowest fare starting from <b>₹${minFare.toLocaleString('en-IN')}</b>.`;
+    }
 
     calendarChartInstance = new Chart(ctx, {
         type: 'bar',
@@ -1152,7 +1154,9 @@ function renderCalendarChart(srcCode, dstCode, cabinClass) {
 }
 
 function renderHoursChart(srcCode, dstCode, cabinClass) {
-    const ctx = document.getElementById('hoursChart').getContext('2d');
+    const canvas = document.getElementById('hoursChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     const slots = [
         { label: 'Early Morning (04-08)', slot: 'Early_Morning' },
         { label: 'Morning (08-12)', slot: 'Morning' },
@@ -1168,6 +1172,15 @@ function renderHoursChart(srcCode, dstCode, cabinClass) {
 
     if (hoursChartInstance) {
         hoursChartInstance.destroy();
+    }
+
+    const minHourFare = Math.min(...fares);
+    const minHourIdx = fares.indexOf(minHourFare);
+    const bestSlot = slots[minHourIdx];
+
+    const hourBox = document.getElementById('hoursInsightBox');
+    if (hourBox) {
+        hourBox.innerHTML = `⏰ <b>Optimal Departure Window:</b> <b>${bestSlot.label}</b> with average fares starting from <b>₹${minHourFare.toLocaleString('en-IN')}</b>.`;
     }
 
     hoursChartInstance = new Chart(ctx, {
@@ -1222,9 +1235,11 @@ function switchTab(tabId) {
     const content = document.getElementById(`tab-${tabId}`);
     if (content) content.classList.add('active');
 
+    const srcCode = document.getElementById('originSelect')?.value || 'DEL';
+    const dstCode = document.getElementById('destSelect')?.value || 'BOM';
+    const cabinClass = document.getElementById('classSelect')?.value || 'Economy';
+
     if (tabId === 'map') {
-        const srcCode = document.getElementById('originSelect').value || 'DEL';
-        const dstCode = document.getElementById('destSelect').value || 'BOM';
         renderRouteMap(srcCode, dstCode);
         setTimeout(() => {
             if (routeMapInstance) {
@@ -1237,6 +1252,16 @@ function switchTab(tabId) {
                 });
             }
         }, 150);
+    } else if (tabId === 'calendar') {
+        setTimeout(() => {
+            renderCalendarChart(srcCode, dstCode, cabinClass);
+        }, 60);
+    } else if (tabId === 'hours') {
+        setTimeout(() => {
+            renderHoursChart(srcCode, dstCode, cabinClass);
+        }, 60);
+    } else if (tabId === 'airports') {
+        populateAirportsTable();
     }
 }
 
