@@ -116,12 +116,12 @@ const AIRPORTS = {
 
 // Modern Active Indian Airlines
 const AIRLINES = {
-    'IndiGo': { iata: '6E', type: 'Low-Cost Leader', color: '#002B49', badge_bg: '#e0f2fe', badge_color: '#0369a1', aircraft: ['Airbus A320neo', 'Airbus A321neo'], punctuality: 92, has_business: false },
-    'Air India': { iata: 'AI', type: 'Full-Service Flagship', color: '#ED1C24', badge_bg: '#fee2e2', badge_color: '#b91c1c', aircraft: ['Airbus A320neo', 'Boeing 787-8 Dreamliner'], punctuality: 84, has_business: true },
-    'Vistara': { iata: 'UK', type: 'Premium Full-Service', color: '#582C83', badge_bg: '#f3e8ff', badge_color: '#7e22ce', aircraft: ['Airbus A320neo', 'Airbus A321neo'], punctuality: 89, has_business: true },
-    'Akasa Air': { iata: 'QP', type: 'Modern Low-Cost', color: '#FF5F00', badge_bg: '#ffedd5', badge_color: '#c2410c', aircraft: ['Boeing 737 MAX 8'], punctuality: 91, has_business: false },
-    'Air India Express': { iata: 'IX', type: 'Value Budget Carrier', color: '#E4501F', badge_bg: '#ffedd5', badge_color: '#9a3412', aircraft: ['Boeing 737-800'], punctuality: 83, has_business: false },
-    'SpiceJet': { iata: 'SG', type: 'Budget Low-Cost', color: '#F7941D', badge_bg: '#fef3c7', badge_color: '#b45309', aircraft: ['Boeing 737-800', 'De Havilland Q400'], punctuality: 79, has_business: false }
+    'IndiGo': { iata: '6E', type: 'Low-Cost Leader', color: '#002B49', badge_bg: '#e0f2fe', badge_color: '#0369a1', aircraft: ['Airbus A320neo', 'Airbus A321neo'], punctuality: 92, has_business: false, portal_url: 'https://www.goindigo.in' },
+    'Air India': { iata: 'AI', type: 'Full-Service Flagship', color: '#ED1C24', badge_bg: '#fee2e2', badge_color: '#b91c1c', aircraft: ['Airbus A320neo', 'Boeing 787-8 Dreamliner'], punctuality: 84, has_business: true, portal_url: 'https://www.airindia.com' },
+    'Vistara': { iata: 'UK', type: 'Premium Full-Service', color: '#582C83', badge_bg: '#f3e8ff', badge_color: '#7e22ce', aircraft: ['Airbus A320neo', 'Airbus A321neo'], punctuality: 89, has_business: true, portal_url: 'https://www.airvistara.com' },
+    'Akasa Air': { iata: 'QP', type: 'Modern Low-Cost', color: '#FF5F00', badge_bg: '#ffedd5', badge_color: '#c2410c', aircraft: ['Boeing 737 MAX 8'], punctuality: 91, has_business: false, portal_url: 'https://www.akasaair.com' },
+    'Air India Express': { iata: 'IX', type: 'Value Budget Carrier', color: '#E4501F', badge_bg: '#ffedd5', badge_color: '#9a3412', aircraft: ['Boeing 737-800'], punctuality: 83, has_business: false, portal_url: 'https://www.airindiaexpress.com' },
+    'SpiceJet': { iata: 'SG', type: 'Budget Low-Cost', color: '#F7941D', badge_bg: '#fef3c7', badge_color: '#b45309', aircraft: ['Boeing 737-800', 'De Havilland Q400'], punctuality: 79, has_business: false, portal_url: 'https://www.spicejet.com' }
 };
 
 // ==========================================
@@ -308,6 +308,11 @@ function generateFlights(srcCode, dstCode, travelDateStr, cabinClass) {
         const viaHub = (srcCode !== 'DEL' && dstCode !== 'DEL') ? 'DEL' : 'BOM';
         const stopsStr = item.stops === 0 ? 'Non-stop (Direct)' : `1 Stop (via ${viaHub})`;
 
+        const isEcoAircraft = airMeta.aircraft[0].includes('neo') || airMeta.aircraft[0].includes('MAX');
+        const co2Kg = Math.round(routeData.distanceKm * (isEcoAircraft ? 0.096 : 0.118));
+        const googleFlightsUrl = `https://www.google.com/travel/flights?q=Flights%20to%20${dstCode}%20from%20${srcCode}%20on%20${travelDateStr}`;
+        const carrierUrl = airMeta.portal_url || 'https://www.google.com/travel/flights';
+
         results.push({
             flightNumber: item.num,
             airline: item.airline,
@@ -315,6 +320,10 @@ function generateFlights(srcCode, dstCode, travelDateStr, cabinClass) {
             badgeBg: airMeta.badge_bg,
             badgeColor: airMeta.badge_color,
             aircraft: airMeta.aircraft[0],
+            isEco: isEcoAircraft,
+            co2Kg: co2Kg,
+            googleFlightsUrl: googleFlightsUrl,
+            carrierUrl: carrierUrl,
             punctuality: airMeta.punctuality,
             srcCode: srcCode,
             dstCode: dstCode,
@@ -398,25 +407,85 @@ function getAdvisorGuidance(daysLeft, lowestFare, srcCode, dstCode) {
 // ==========================================
 let calendarChartInstance = null;
 let hoursChartInstance = null;
+let currentTripType = 'oneway';
 
 document.addEventListener('DOMContentLoaded', () => {
     initAirportDropdowns();
     initCurrentDate();
+    initTripTypeControls();
+    initWatchlistControls();
     initDefaultSearch();
     populateAirportsTable();
+    updateWatchlistBadge();
 });
 
 function initCurrentDate() {
     const now = new Date();
     const options = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' };
-    document.getElementById('currentDateBadge').textContent = now.toLocaleDateString('en-IN', options);
+    const dateBadge = document.getElementById('currentDateBadge');
+    if (dateBadge) dateBadge.textContent = now.toLocaleDateString('en-IN', options);
 
     // Set default travel date (+7 days)
     const future = new Date();
     future.setDate(future.getDate() + 7);
-    document.getElementById('travelDateInput').value = future.toISOString().split('T')[0];
-    document.getElementById('travelDateInput').min = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const travelInput = document.getElementById('travelDateInput');
+    if (travelInput) {
+        travelInput.value = future.toISOString().split('T')[0];
+        travelInput.min = todayStr;
+        travelInput.addEventListener('change', () => {
+            const retInput = document.getElementById('returnDateInput');
+            if (retInput) {
+                retInput.min = travelInput.value;
+                if (retInput.value < travelInput.value) {
+                    const retD = new Date(travelInput.value);
+                    retD.setDate(retD.getDate() + 4);
+                    retInput.value = retD.toISOString().split('T')[0];
+                }
+            }
+            executeSearch();
+        });
+    }
+
+    // Set default return date (+11 days)
+    const returnFuture = new Date();
+    returnFuture.setDate(returnFuture.getDate() + 11);
+    const returnInput = document.getElementById('returnDateInput');
+    if (returnInput) {
+        returnInput.value = returnFuture.toISOString().split('T')[0];
+        returnInput.min = travelInput ? travelInput.value : todayStr;
+        returnInput.addEventListener('change', () => {
+            if (currentTripType === 'roundtrip') executeSearch();
+        });
+    }
 }
+
+function initTripTypeControls() {
+    const btnOneWay = document.getElementById('btnOneWay');
+    const btnRoundTrip = document.getElementById('btnRoundTrip');
+
+    if (btnOneWay) btnOneWay.addEventListener('click', () => setTripType('oneway'));
+    if (btnRoundTrip) btnRoundTrip.addEventListener('click', () => setTripType('roundtrip'));
+}
+
+function setTripType(type) {
+    currentTripType = type;
+    const btnOneWay = document.getElementById('btnOneWay');
+    const btnRoundTrip = document.getElementById('btnRoundTrip');
+    const returnGroup = document.getElementById('returnDateGroup');
+
+    if (type === 'roundtrip') {
+        if (btnRoundTrip) btnRoundTrip.classList.add('active');
+        if (btnOneWay) btnOneWay.classList.remove('active');
+        if (returnGroup) returnGroup.style.display = 'block';
+    } else {
+        if (btnOneWay) btnOneWay.classList.add('active');
+        if (btnRoundTrip) btnRoundTrip.classList.remove('active');
+        if (returnGroup) returnGroup.style.display = 'none';
+    }
+    executeSearch();
+}
+
 
 // ==========================================
 // INTERACTIVE TYPEABLE AIRPORT COMBOBOX
@@ -751,6 +820,8 @@ function executeSearch() {
     renderSummaryCards(flights, srcCode, dstCode, dateVal);
     renderCalendarChart(srcCode, dstCode, cabinClass);
     renderHoursChart(srcCode, dstCode, cabinClass);
+    updateTrackButtonState();
+    renderRouteMap(srcCode, dstCode);
 }
 
 function renderSummaryCards(flights, srcCode, dstCode, dateVal) {
@@ -766,6 +837,7 @@ function renderSummaryCards(flights, srcCode, dstCode, dateVal) {
     const daysLeft = Math.max(0, Math.ceil((travelDate - today) / (1000 * 60 * 60 * 24)));
 
     const advisor = getAdvisorGuidance(daysLeft, cheapest.livePrice, srcCode, dstCode);
+    const physics = calculateRoutePhysics(srcCode, dstCode, 0);
 
     // 1. Cheapest
     document.getElementById('summaryCheapestPrice').textContent = `₹${cheapest.livePrice.toLocaleString('en-IN')}`;
@@ -781,6 +853,24 @@ function renderSummaryCards(flights, srcCode, dstCode, dateVal) {
     adviceEl.textContent = advisor.action;
     adviceEl.style.color = advisor.color;
     document.getElementById('summaryAdviceSub').innerHTML = `<b>${advisor.dropProb}% chance prices drop</b> • ${daysLeft} days before flight`;
+
+    // 4. Carbon Footprint Pill
+    const carbonPill = document.getElementById('carbonSummaryPill');
+    const carbonKg = document.getElementById('carbonKgValue');
+    if (carbonPill && carbonKg) {
+        carbonPill.style.display = 'inline-flex';
+        carbonKg.textContent = `${Math.round(physics.distanceKm * 0.105)} kg CO₂`;
+    }
+
+    // 5. Update Map Header Badges
+    const mapDist = document.getElementById('mapDistanceBadge');
+    const mapDur = document.getElementById('mapDurationBadge');
+    const mapSub = document.getElementById('mapRouteSubtitle');
+    const src = AIRPORTS[srcCode] || AIRPORTS['DEL'];
+    const dst = AIRPORTS[dstCode] || AIRPORTS['BOM'];
+    if (mapDist) mapDist.textContent = `Distance: ${physics.distanceKm.toLocaleString('en-IN')} KM`;
+    if (mapDur) mapDur.textContent = `Duration: ${fastest.durationStr}`;
+    if (mapSub) mapSub.innerHTML = `Great-circle corridor: <b>${src.city} (${srcCode})</b> ➔ <b>${dst.city} (${dstCode})</b> (${physics.distanceKm.toLocaleString('en-IN')} km)`;
 }
 
 function applyFilters() {
@@ -820,13 +910,15 @@ function renderFlightCards(flights) {
     const srcCode = document.getElementById('originSelect').value;
     const dstCode = document.getElementById('destSelect').value;
     const dateVal = document.getElementById('travelDateInput').value;
+    const cabinClass = document.getElementById('classSelect').value;
     const dateObj = new Date(dateVal);
 
     const src = AIRPORTS[srcCode] || AIRPORTS['DEL'];
     const dst = AIRPORTS[dstCode] || AIRPORTS['BOM'];
 
+    let tripTypeNote = currentTripType === 'roundtrip' ? ' (Outbound Leg)' : '';
     document.getElementById('routeHeaderInfo').innerHTML =
-        `Showing <b>${flights.length}</b> verified flights from <b>${src.name} (${srcCode})</b> ➔ <b>${dst.name} (${dstCode})</b> on <b>${dateObj.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}</b>:`;
+        `Showing <b>${flights.length}</b> verified flights from <b>${src.name} (${srcCode})</b> ➔ <b>${dst.name} (${dstCode})</b> on <b>${dateObj.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}${tripTypeNote}</b>:`;
 
     if (flights.length === 0) {
         container.innerHTML = `<div class="insight-box" style="text-align: center; padding: 24px;">No flights matched your filter criteria. Try selecting 'All Airlines' or 'All Flights'.</div>`;
@@ -834,6 +926,59 @@ function renderFlightCards(flights) {
     }
 
     let html = '';
+
+    // If Round-Trip is active, render combined bundle banner
+    if (currentTripType === 'roundtrip') {
+        const returnDateVal = document.getElementById('returnDateInput').value;
+        const returnFlights = generateFlights(dstCode, srcCode, returnDateVal, cabinClass);
+        const cheapestOutbound = flights.reduce((p, c) => p.livePrice < c.livePrice ? p : c);
+        const cheapestReturn = returnFlights && returnFlights.length > 0 ? returnFlights.reduce((p, c) => p.livePrice < c.livePrice ? p : c) : null;
+
+        if (cheapestReturn) {
+            const retDateObj = new Date(returnDateVal);
+            const totalRegular = cheapestOutbound.livePrice + cheapestReturn.livePrice;
+            const discountedTotal = Math.round(totalRegular * 0.95); // 5% bundle discount
+            const bundleSavings = totalRegular - discountedTotal;
+
+            html += `
+            <div class="round-trip-banner">
+                <div class="round-trip-banner-header">
+                    <div class="round-trip-banner-title">
+                        <span>🔄 Round-Trip Combined Itinerary</span>
+                    </div>
+                    <div class="round-trip-discount-tag">
+                        🎁 5% Return Combo Saver Applied (Save ₹${bundleSavings.toLocaleString('en-IN')})
+                    </div>
+                </div>
+
+                <div class="round-trip-legs-grid">
+                    <div class="round-trip-leg-card">
+                        <div class="round-trip-leg-label">🛫 Outbound Leg (${dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })})</div>
+                        <div class="round-trip-leg-info">
+                            <b>${cheapestOutbound.airline}</b> • ${srcCode} ➔ ${dstCode}<br>
+                            ${cheapestOutbound.departureTime} ➔ ${cheapestOutbound.arrivalTime} (${cheapestOutbound.durationStr})
+                        </div>
+                    </div>
+
+                    <div class="round-trip-leg-card">
+                        <div class="round-trip-leg-label">🛬 Return Leg (${retDateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })})</div>
+                        <div class="round-trip-leg-info">
+                            <b>${cheapestReturn.airline}</b> • ${dstCode} ➔ ${srcCode}<br>
+                            ${cheapestReturn.departureTime} ➔ ${cheapestReturn.arrivalTime} (${cheapestReturn.durationStr})
+                        </div>
+                    </div>
+
+                    <div class="round-trip-total-box">
+                        <div class="round-trip-total-label">Round-Trip Total</div>
+                        <div class="round-trip-total-val">₹${discountedTotal.toLocaleString('en-IN')}</div>
+                        <div class="round-trip-total-sub">₹${totalRegular.toLocaleString('en-IN')}</div>
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+    }
+
     flights.forEach((f, idx) => {
         html += `
         <div class="flight-card">
@@ -879,6 +1024,23 @@ function renderFlightCards(flights) {
                 </div>
             </div>
 
+            <div class="card-action-bar">
+                <div>
+                    ${f.isEco 
+                        ? `<span class="eco-saver-tag">🌿 Eco-Fleet (A320neo / MAX • ~${f.co2Kg} kg CO₂)</span>` 
+                        : `<span class="eco-saver-tag" style="background: rgba(255,255,255,0.05); color: #94a3b8; border-color: rgba(255,255,255,0.1);">⚙️ Standard Turbofan (~${f.co2Kg} kg CO₂)</span>`
+                    }
+                </div>
+                <div class="book-btn-group">
+                    <a href="${f.carrierUrl}" target="_blank" rel="noopener noreferrer" class="book-carrier-btn">
+                        ✈ Official ${f.airline} Portal ↗
+                    </a>
+                    <a href="${f.googleFlightsUrl}" target="_blank" rel="noopener noreferrer" class="book-airline-btn">
+                        🔍 View Live Seats on Google Flights ↗
+                    </a>
+                </div>
+            </div>
+
             <button type="button" class="details-toggle" onclick="toggleDetails(${idx})">
                 📋 View Fare Breakdown & Baggage Policy ▾
             </button>
@@ -906,6 +1068,7 @@ function renderFlightCards(flights) {
 
     container.innerHTML = html;
 }
+
 
 function toggleDetails(idx) {
     const el = document.getElementById(`details-${idx}`);
@@ -1053,12 +1216,33 @@ function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-    event.target.classList.add('active');
-    document.getElementById(`tab-${tabId}`).classList.add('active');
+    const btn = document.getElementById(`tabBtn-${tabId}`);
+    if (btn) btn.classList.add('active');
+
+    const content = document.getElementById(`tab-${tabId}`);
+    if (content) content.classList.add('active');
+
+    if (tabId === 'map') {
+        const srcCode = document.getElementById('originSelect').value || 'DEL';
+        const dstCode = document.getElementById('destSelect').value || 'BOM';
+        renderRouteMap(srcCode, dstCode);
+        setTimeout(() => {
+            if (routeMapInstance) {
+                routeMapInstance.invalidateSize();
+                const src = AIRPORTS[srcCode] || AIRPORTS['DEL'];
+                const dst = AIRPORTS[dstCode] || AIRPORTS['BOM'];
+                routeMapInstance.fitBounds([[src.lat, src.lon], [dst.lat, dst.lon]], {
+                    padding: [50, 50],
+                    maxZoom: 7
+                });
+            }
+        }, 150);
+    }
 }
 
 function populateAirportsTable() {
     const tbody = document.getElementById('airportsTableBody');
+    if (!tbody) return;
     const sorted = Object.entries(AIRPORTS).sort((a, b) => a[1].city.localeCompare(b[1].city));
 
     let html = '';
@@ -1078,7 +1262,9 @@ function populateAirportsTable() {
 }
 
 function filterAirportsTable() {
-    const query = document.getElementById('airportSearchInput').value.toLowerCase();
+    const input = document.getElementById('airportSearchInput');
+    if (!input) return;
+    const query = input.value.toLowerCase();
     const rows = document.querySelectorAll('#airportsTableBody tr');
 
     rows.forEach(row => {
@@ -1086,3 +1272,351 @@ function filterAirportsTable() {
         row.style.display = text.includes(query) ? '' : 'none';
     });
 }
+
+// ==========================================
+// 9. INTERACTIVE LIVE ROUTE RADAR MAP (LEAFLET.JS)
+// ==========================================
+let routeMapInstance = null;
+let routeLayersGroup = null;
+
+function renderRouteMap(srcCode, dstCode) {
+    const mapEl = document.getElementById('routeMapContainer');
+    if (!mapEl || typeof L === 'undefined') return;
+
+    const src = AIRPORTS[srcCode] || AIRPORTS['DEL'];
+    const dst = AIRPORTS[dstCode] || AIRPORTS['BOM'];
+    const physics = calculateRoutePhysics(srcCode, dstCode, 0);
+
+    // Initialize Leaflet map if not already done
+    if (!routeMapInstance) {
+        routeMapInstance = L.map('routeMapContainer', {
+            zoomControl: true,
+            attributionControl: false
+        }).setView([22.5, 78.9], 5);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 18,
+            subdomains: 'abcd'
+        }).addTo(routeMapInstance);
+
+        routeLayersGroup = L.layerGroup().addTo(routeMapInstance);
+    }
+
+    routeLayersGroup.clearLayers();
+
+    // 1. Pan-India background airport radar network (subtle dots for all 89 airports)
+    Object.entries(AIRPORTS).forEach(([code, data]) => {
+        if (code === srcCode || code === dstCode) return;
+        const netDot = L.circleMarker([data.lat, data.lon], {
+            radius: 3,
+            color: '#38bdf8',
+            weight: 1,
+            fillColor: '#0284c7',
+            fillOpacity: 0.35
+        });
+        netDot.bindPopup(`
+            <div style="font-size: 0.8rem; line-height: 1.4;">
+                <b style="color: #38bdf8;">${data.city} (${code})</b><br>
+                <span>${data.name}</span><br>
+                <small style="color: #94a3b8;">${data.state} • ${data.tier}</small>
+            </div>
+        `);
+        routeLayersGroup.addLayer(netDot);
+    });
+
+    // 2. Geodesic / Great-circle curved arc calculation
+    const points = [];
+    const numSegments = 32;
+    const midLat = (src.lat + dst.lat) / 2;
+    const midLon = (src.lon + dst.lon) / 2;
+    const dx = dst.lon - src.lon;
+    const dy = dst.lat - src.lat;
+    const arcBulge = 0.16;
+    const perpX = -dy * arcBulge;
+    const perpY = dx * arcBulge;
+
+    for (let i = 0; i <= numSegments; i++) {
+        const t = i / numSegments;
+        const ctrlLat = midLat + perpY;
+        const ctrlLon = midLon + perpX;
+        const lat = (1 - t) * (1 - t) * src.lat + 2 * (1 - t) * t * ctrlLat + t * t * dst.lat;
+        const lon = (1 - t) * (1 - t) * src.lon + 2 * (1 - t) * t * ctrlLon + t * t * dst.lon;
+        points.push([lat, lon]);
+    }
+
+    // Glow line (ambient flight corridor)
+    const glowLine = L.polyline(points, {
+        color: '#38bdf8',
+        weight: 7,
+        opacity: 0.28
+    });
+    routeLayersGroup.addLayer(glowLine);
+
+    // Active trajectory dashed line
+    const flightLine = L.polyline(points, {
+        color: '#00f2fe',
+        weight: 3.5,
+        dashArray: '8, 8',
+        opacity: 0.95
+    });
+    routeLayersGroup.addLayer(flightLine);
+
+    // 3. Origin Airport Pin (Glowing Green)
+    const originIcon = L.divIcon({
+        className: 'origin-marker-icon',
+        html: `<div style="background: #10b981; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 0 16px #10b981;"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+    });
+    const originMarker = L.marker([src.lat, src.lon], { icon: originIcon });
+    originMarker.bindPopup(`
+        <div style="font-size: 0.85rem; line-height: 1.45;">
+            <b style="color: #10b981; font-size: 0.92rem;">🛫 ORIGIN AIRFIELD</b><br>
+            <b>${src.city} (${srcCode})</b><br>
+            ${src.name}<br>
+            <small style="color: #94a3b8;">${src.state} • ${src.tier} Station</small>
+        </div>
+    `);
+    routeLayersGroup.addLayer(originMarker);
+
+    // 4. Destination Airport Pin (Glowing Blue)
+    const destIcon = L.divIcon({
+        className: 'dest-marker-icon',
+        html: `<div style="background: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 0 16px #3b82f6;"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+    });
+    const destMarker = L.marker([dst.lat, dst.lon], { icon: destIcon });
+    destMarker.bindPopup(`
+        <div style="font-size: 0.85rem; line-height: 1.45;">
+            <b style="color: #60a5fa; font-size: 0.92rem;">🛬 DESTINATION AIRFIELD</b><br>
+            <b>${dst.city} (${dstCode})</b><br>
+            ${dst.name}<br>
+            <small style="color: #94a3b8;">${dst.state} • ${dst.tier} Station</small>
+        </div>
+    `);
+    routeLayersGroup.addLayer(destMarker);
+
+    // 5. Midpoint Flight Plane Icon
+    const midPoint = points[Math.floor(points.length / 2)];
+    const planeIcon = L.divIcon({
+        className: 'plane-corridor-icon',
+        html: `<div style="background: #0f172a; color: #00f2fe; border: 1.5px solid #00f2fe; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; box-shadow: 0 0 12px rgba(0, 242, 254, 0.6);">✈</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+    });
+    const midMarker = L.marker(midPoint, { icon: planeIcon });
+    midMarker.bindPopup(`
+        <div style="font-size: 0.85rem; line-height: 1.45;">
+            <b style="color: #00f2fe;">✈ Active Cruising Corridor</b><br>
+            Route: <b>${src.city} ➔ ${dst.city}</b><br>
+            Geodesic Distance: <b>${physics.distanceKm.toLocaleString('en-IN')} km</b><br>
+            Flight Time: <b>~${Math.floor(physics.durationHours)}h ${Math.round((physics.durationHours % 1) * 60)}m</b>
+        </div>
+    `);
+    routeLayersGroup.addLayer(midMarker);
+
+    // Auto-fit bounds
+    routeMapInstance.fitBounds([[src.lat, src.lon], [dst.lat, dst.lon]], {
+        padding: [50, 50],
+        maxZoom: 7
+    });
+}
+
+// ==========================================
+// 10. SAVED ROUTE WATCHLIST & PRICE ALERTS
+// ==========================================
+const WATCHLIST_STORAGE_KEY = 'aeropulse_saved_watchlist_v1';
+
+function getWatchlist() {
+    try {
+        return JSON.parse(localStorage.getItem(WATCHLIST_STORAGE_KEY) || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveWatchlist(list) {
+    try {
+        localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(list));
+    } catch (e) {
+        console.error('Failed to save watchlist to localStorage', e);
+    }
+}
+
+function updateWatchlistBadge() {
+    const list = getWatchlist();
+    const badge = document.getElementById('watchlistNavCount');
+    if (badge) {
+        badge.textContent = list.length;
+    }
+}
+
+function updateTrackButtonState() {
+    const srcCode = document.getElementById('originSelect').value || 'DEL';
+    const dstCode = document.getElementById('destSelect').value || 'BOM';
+    const btn = document.getElementById('btnTrackRoute');
+    if (!btn) return;
+
+    const list = getWatchlist();
+    const isTracked = list.some(item => item.srcCode === srcCode && item.dstCode === dstCode);
+
+    if (isTracked) {
+        btn.classList.add('tracked');
+        btn.innerHTML = '✓ Tracking Route';
+    } else {
+        btn.classList.remove('tracked');
+        btn.innerHTML = '⭐ Track Fare';
+    }
+}
+
+function toggleTrackCurrentRoute() {
+    const srcCode = document.getElementById('originSelect').value || 'DEL';
+    const dstCode = document.getElementById('destSelect').value || 'BOM';
+    const travelDate = document.getElementById('travelDateInput').value;
+    const src = AIRPORTS[srcCode] || AIRPORTS['DEL'];
+    const dst = AIRPORTS[dstCode] || AIRPORTS['BOM'];
+
+    let list = getWatchlist();
+    const existingIndex = list.findIndex(item => item.srcCode === srcCode && item.dstCode === dstCode);
+
+    if (existingIndex >= 0) {
+        list.splice(existingIndex, 1);
+        saveWatchlist(list);
+        updateTrackButtonState();
+        updateWatchlistBadge();
+        renderWatchlistDrawer();
+    } else {
+        const lowestEl = document.getElementById('summaryCheapestPrice');
+        let currentPrice = 3500;
+        if (lowestEl) {
+            const parsed = parseInt(lowestEl.textContent.replace(/[^0-9]/g, ''));
+            if (!isNaN(parsed) && parsed > 0) currentPrice = parsed;
+        }
+
+        list.unshift({
+            id: `${srcCode}-${dstCode}-${Date.now()}`,
+            srcCode: srcCode,
+            dstCode: dstCode,
+            srcCity: src.city,
+            dstCity: dst.city,
+            travelDate: travelDate,
+            baselinePrice: currentPrice,
+            savedAt: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        });
+
+        saveWatchlist(list);
+        updateTrackButtonState();
+        updateWatchlistBadge();
+        renderWatchlistDrawer();
+    }
+}
+
+function initWatchlistControls() {
+    const trackBtn = document.getElementById('btnTrackRoute');
+    if (trackBtn) {
+        trackBtn.addEventListener('click', toggleTrackCurrentRoute);
+    }
+
+    const navBtn = document.getElementById('navWatchlistBtn');
+    if (navBtn) {
+        navBtn.addEventListener('click', () => toggleWatchlistModal(true));
+    }
+}
+
+function toggleWatchlistModal(forceState) {
+    const modal = document.getElementById('watchlistModal');
+    if (!modal) return;
+
+    if (typeof forceState === 'boolean') {
+        modal.style.display = forceState ? 'block' : 'none';
+    } else {
+        modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+    }
+
+    if (modal.style.display === 'block') {
+        renderWatchlistDrawer();
+    }
+}
+
+function renderWatchlistDrawer() {
+    const container = document.getElementById('watchlistItemsList');
+    if (!container) return;
+
+    const list = getWatchlist();
+    if (list.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 48px 20px; color: #94a3b8;">
+                <div style="font-size: 2.4rem; margin-bottom: 12px;">⭐</div>
+                <div style="font-weight: 700; color: #f1f5f9; font-size: 1rem; margin-bottom: 6px;">No Tracked Routes Yet</div>
+                <div style="font-size: 0.85rem; line-height: 1.5;">Click the "⭐ Track Fare" button above on any search to monitor price swings and real-time alerts.</div>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    list.forEach(item => {
+        // Calculate live price for comparison
+        const flights = generateFlights(item.srcCode, item.dstCode, item.travelDate, 'Economy');
+        const currentCheapest = flights && flights.length > 0 ? Math.min(...flights.map(f => f.livePrice)) : item.baselinePrice;
+        const diff = item.baselinePrice - currentCheapest;
+        let deltaHtml = '';
+
+        if (diff > 0) {
+            deltaHtml = `<span style="color: #10b981; font-weight: 700; font-size: 0.82rem;">🟢 Fares dropped ₹${diff.toLocaleString('en-IN')}!</span>`;
+        } else if (diff < 0) {
+            deltaHtml = `<span style="color: #ef4444; font-weight: 700; font-size: 0.82rem;">🔴 Fares up +₹${Math.abs(diff).toLocaleString('en-IN')}</span>`;
+        } else {
+            deltaHtml = `<span style="color: #38bdf8; font-weight: 600; font-size: 0.82rem;">🔵 Stable at ₹${currentCheapest.toLocaleString('en-IN')}</span>`;
+        }
+
+        html += `
+        <div class="watchlist-card">
+            <div class="watchlist-card-top">
+                <div class="watchlist-route-title">${item.srcCity} (${item.srcCode}) ➔ ${item.dstCity} (${item.dstCode})</div>
+                <div class="watchlist-price-badge">₹${currentCheapest.toLocaleString('en-IN')}</div>
+            </div>
+
+            <div class="watchlist-card-meta">
+                <span>📅 Target: <b>${item.travelDate}</b></span>
+                <span>Tracked at: ₹${item.baselinePrice.toLocaleString('en-IN')}</span>
+            </div>
+
+            <div style="margin-bottom: 10px;">${deltaHtml}</div>
+
+            <div class="watchlist-actions-row">
+                <button type="button" class="watchlist-search-btn" onclick="loadTrackedRoute('${item.srcCode}', '${item.dstCode}', '${item.travelDate}')">
+                    ✈ View Live Flights
+                </button>
+                <button type="button" class="watchlist-del-btn" onclick="removeWatchlistItem('${item.id}')" title="Delete from watchlist">
+                    ✕ Remove
+                </button>
+            </div>
+        </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function removeWatchlistItem(id) {
+    let list = getWatchlist();
+    list = list.filter(item => item.id !== id);
+    saveWatchlist(list);
+    updateWatchlistBadge();
+    updateTrackButtonState();
+    renderWatchlistDrawer();
+}
+
+function loadTrackedRoute(srcCode, dstCode, travelDate) {
+    setAirport('origin', srcCode, false);
+    setAirport('dest', dstCode, false);
+    if (travelDate) {
+        const dateInput = document.getElementById('travelDateInput');
+        if (dateInput) dateInput.value = travelDate;
+    }
+    toggleWatchlistModal(false);
+    executeSearch();
+}
+

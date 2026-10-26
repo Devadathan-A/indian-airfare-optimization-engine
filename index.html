@@ -10,6 +10,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <!-- Chart.js for interactive analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet for Interactive Route Radar Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -26,13 +29,28 @@
                     <span class="status-dot"></span> Live Market Feed (DGCA 2026)
                 </span>
                 <span class="airport-count-badge" id="airportCountBadge">89 Airports</span>
+                <button type="button" class="watchlist-nav-btn" onclick="toggleWatchlistModal()" title="View Saved Routes">
+                    ⭐ Watchlist (<span id="watchlistNavCount">0</span>)
+                </button>
                 <span class="date-badge" id="currentDateBadge"></span>
             </div>
         </header>
 
         <!-- Search Card -->
         <section class="search-card">
-            <div class="card-title">🔍 Search Any Domestic Flight in India (Metros, Regional & Islands)</div>
+            <div class="card-title-row">
+                <div class="card-title">🔍 Domestic Flight Search & Valuation Engine</div>
+                <!-- Trip Type & Watchlist Bar -->
+                <div class="trip-options-bar">
+                    <div class="trip-type-toggle">
+                        <button type="button" class="trip-toggle-btn active" id="btnOneWay" onclick="setTripType('oneway')">One-Way</button>
+                        <button type="button" class="trip-toggle-btn" id="btnRoundTrip" onclick="setTripType('roundtrip')">Round-Trip (-5%)</button>
+                    </div>
+                    <button type="button" class="track-route-btn" id="btnTrackRoute" onclick="toggleTrackCurrentRoute()" title="Track price alerts for this route">
+                        ⭐ Track Fare
+                    </button>
+                </div>
+            </div>
 
             <!-- Popular Route Presets -->
             <div class="popular-routes-row">
@@ -46,7 +64,7 @@
 
             <!-- Search Inputs Grid -->
             <form id="searchForm" onsubmit="event.preventDefault(); executeSearch();">
-                <div class="search-inputs-grid">
+                <div class="search-inputs-grid" id="searchInputsGrid">
                     <div class="form-group combobox-group" id="originComboboxGroup">
                         <label for="originInput">Departure Airport (Origin)</label>
                         <div class="combobox-wrapper">
@@ -89,9 +107,14 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="travelDateInput">Travel Date</label>
+                    <div class="form-group" id="departDateGroup">
+                        <label for="travelDateInput" id="departDateLabel">Travel Date</label>
                         <input type="date" id="travelDateInput" class="form-control">
+                    </div>
+
+                    <div class="form-group" id="returnDateGroup" style="display: none;">
+                        <label for="returnDateInput">Return Date</label>
+                        <input type="date" id="returnDateInput" class="form-control">
                     </div>
 
                     <div class="form-group">
@@ -142,11 +165,12 @@
 
         <!-- Navigation Tabs -->
         <nav class="tabs-nav">
-            <button class="tab-btn active" onclick="switchTab('flights')">✈️ Available Flights (<span id="flightsTabCount">0</span>)</button>
-            <button class="tab-btn" onclick="switchTab('calendar')">📅 30-Day Best Fare Calendar</button>
-            <button class="tab-btn" onclick="switchTab('hours')">⏰ Best Time of Day to Fly</button>
-            <button class="tab-btn" onclick="switchTab('airports')">🇮🇳 All 89 Airports Directory</button>
-            <button class="tab-btn" onclick="switchTab('ai')">🧠 AI Engine & Accuracy (96.8%)</button>
+            <button class="tab-btn active" id="tabBtn-flights" onclick="switchTab('flights')">✈️ Available Flights (<span id="flightsTabCount">0</span>)</button>
+            <button class="tab-btn" id="tabBtn-map" onclick="switchTab('map')">🗺️ Interactive Route Radar</button>
+            <button class="tab-btn" id="tabBtn-calendar" onclick="switchTab('calendar')">📅 30-Day Fare Calendar</button>
+            <button class="tab-btn" id="tabBtn-hours" onclick="switchTab('hours')">⏰ Departure Time Dynamics</button>
+            <button class="tab-btn" id="tabBtn-airports" onclick="switchTab('airports')">🇮🇳 89 Airports Directory</button>
+            <button class="tab-btn" id="tabBtn-ai" onclick="switchTab('ai')">🧠 AI Engine & Accuracy (96.8%)</button>
         </nav>
 
         <!-- TAB 1: FLIGHT RESULTS -->
@@ -178,62 +202,84 @@
                 <div class="filter-group">
                     <label>Sort Results By:</label>
                     <select id="sortFilter" class="filter-select" onchange="applyFilters()">
-                        <option value="price">Cheapest First</option>
-                        <option value="deal">Best AI Deal (Greatest Savings)</option>
-                        <option value="duration">Fastest Duration</option>
-                        <option value="departure">Earliest Departure</option>
+                        <option value="price">Price: Lowest First</option>
+                        <option value="deal">Valuation: Best Deal First</option>
+                        <option value="duration">Duration: Fastest First</option>
+                        <option value="departure">Departure: Earliest First</option>
                     </select>
                 </div>
             </div>
 
-            <div class="route-header-info" id="routeHeaderInfo">
-                Showing flights...
+            <!-- Route Header Info & Carbon Stats -->
+            <div class="results-header-row">
+                <div class="route-header-info" id="routeHeaderInfo">
+                    Showing verified commercial flights...
+                </div>
+                <div class="carbon-summary-pill" id="carbonSummaryPill">
+                    🌿 Est. Carbon: <b id="carbonKgValue">-- kg CO₂</b>
+                </div>
             </div>
 
             <!-- Flight Cards Container -->
-            <div id="flightCardsContainer" class="flight-cards-list"></div>
+            <div id="flightCardsContainer" class="flights-list"></div>
         </main>
 
-        <!-- TAB 2: 30-DAY FARE CALENDAR -->
+        <!-- TAB 2: INTERACTIVE ROUTE RADAR MAP -->
+        <section id="tab-map" class="tab-content">
+            <div class="map-card">
+                <div class="map-card-header">
+                    <div>
+                        <div class="section-title">🗺️ Pan-India Live Geodesic Flight Radar</div>
+                        <div class="section-desc" id="mapRouteSubtitle">
+                            Visualizing Great-Circle aerial trajectory, waypoint coordinates, and cruising corridor across 89 airports.
+                        </div>
+                    </div>
+                    <div class="map-badges-container">
+                        <span class="map-stat-pill" id="mapDistanceBadge">Distance: -- KM</span>
+                        <span class="map-stat-pill" id="mapDurationBadge">Duration: --h --m</span>
+                        <span class="map-stat-pill eco" id="mapEcoBadge">🌿 Eco-Efficient Flight Corridor</span>
+                    </div>
+                </div>
+                <div id="routeMapContainer" class="route-map-view"></div>
+            </div>
+        </section>
+
+        <!-- TAB 3: 30-DAY FARE CALENDAR -->
         <section id="tab-calendar" class="tab-content">
-            <div class="section-title">📅 Lowest Fare Finder (Next 30 Days)</div>
-            <div class="section-desc">Interactive forward-looking forecast of the lowest available fare on this corridor across the next month:</div>
+            <div class="section-title">📅 30-Day Forward Fare Trend (Cheapest Window)</div>
+            <div class="section-desc">Daily lowest fares across upcoming 30 calendar days for your selected route:</div>
             <div class="chart-container">
                 <canvas id="calendarChart"></canvas>
             </div>
-            <div class="insight-box" id="calendarInsightBox">
-                💡 <b>Tip:</b> Compare daily rates to lock in optimal savings.
-            </div>
         </section>
 
-        <!-- TAB 3: HOURLY TIME-OF-DAY DYNAMICS -->
+        <!-- TAB 4: TIME OF DAY DYNAMICS -->
         <section id="tab-hours" class="tab-content">
-            <div class="section-title">⏰ Average Airfare by Departure Time Slot</div>
-            <div class="section-desc">How flight departure timing influences ticket prices due to corporate travel schedules:</div>
+            <div class="section-title">⏰ Price Elasticity by Departure Time of Day</div>
+            <div class="section-desc">Average spot fare distribution across 5 departure banks:</div>
             <div class="chart-container">
                 <canvas id="hoursChart"></canvas>
             </div>
-            <div class="insight-box">
-                💡 <b>Savings Tip:</b> Afternoon flights (12:00 PM – 5:00 PM) are consistently 10% to 18% cheaper than early morning and evening flights preferred by corporate commuters.
-            </div>
         </section>
 
-        <!-- TAB 4: 89 AIRPORTS DIRECTORY -->
+        <!-- TAB 5: 89 AIRPORTS DIRECTORY -->
         <section id="tab-airports" class="tab-content">
             <div class="section-title">🇮🇳 Pan-India Operational Commercial Airports Directory (89 Hubs)</div>
-            <div class="section-desc">Searchable list of all commercial airports supported across all Indian States and Union Territories:</div>
+            <div class="section-desc">Comprehensive network covering Metros, Regional Hubs, UDAN Greenfields, and Island Civil Enclaves:</div>
+
             <div class="table-search-row">
-                <input type="text" id="airportSearchInput" class="form-control" placeholder="Search by city, airport name, state, or IATA code..." onkeyup="filterAirportsTable()">
+                <input type="text" id="airportSearchInput" class="table-search-input" placeholder="Filter by City, Airport Name, State, or Code (e.g., Ayodhya, DEL, Goa)..." onkeyup="filterAirportsTable()">
             </div>
-            <div class="table-container">
-                <table class="data-table" id="airportsTable">
+
+            <div class="table-card">
+                <table class="data-table">
                     <thead>
                         <tr>
-                            <th>IATA Code</th>
-                            <th>City</th>
-                            <th>Airport Name</th>
-                            <th>State / Union Territory</th>
-                            <th>Classification</th>
+                            <th>IATA</th>
+                            <th>City / Station</th>
+                            <th>Airport Official Name</th>
+                            <th>State / UT</th>
+                            <th>Classification Tier</th>
                         </tr>
                     </thead>
                     <tbody id="airportsTableBody"></tbody>
@@ -241,7 +287,7 @@
             </div>
         </section>
 
-        <!-- TAB 5: AI ENGINE & ACCURACY -->
+        <!-- TAB 6: AI ENGINE & ACCURACY -->
         <section id="tab-ai" class="tab-content">
             <div class="section-title">🧠 Machine Learning Architecture & Benchmark (2024-2026 Engine)</div>
             <div class="section-desc">Technical breakdown of model training, feature vectors, and evaluation metrics:</div>
@@ -299,10 +345,28 @@
             </div>
         </section>
 
+        <!-- Watchlist Modal / Slide-over Drawer -->
+        <div id="watchlistModal" class="watchlist-modal" style="display: none;">
+            <div class="watchlist-backdrop" onclick="toggleWatchlistModal()"></div>
+            <div class="watchlist-content">
+                <div class="watchlist-header">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.25rem;">⭐</span>
+                        <h3 style="margin: 0; font-size: 1.15rem; color: #ffffff;">Saved Route Watchlist & Price Alerts</h3>
+                    </div>
+                    <button type="button" class="close-modal-btn" onclick="toggleWatchlistModal()">×</button>
+                </div>
+                <p class="watchlist-sub">Your bookmarked domestic routes are tracked in your browser. Real-time fare volatility and drop alerts update on every visit.</p>
+                <div id="watchlistItemsList" class="watchlist-items-list">
+                    <!-- Populated dynamically via app.js -->
+                </div>
+            </div>
+        </div>
+
         <!-- Footer -->
         <footer class="footer">
             <div>AeroPulse India • Pan-India Commercial Airfare Optimization Engine</div>
-            <div class="footer-sub">Zero-Dependency Pure Web Architecture • GitHub Pages & Local Ready • Developed for AI/ML Capstone</div>
+            <div class="footer-sub">Zero-Dependency Pure Web Architecture • GitHub Pages Live • Developed for AI/ML Capstone</div>
         </footer>
     </div>
 

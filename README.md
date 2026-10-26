@@ -25,11 +25,16 @@ The entire web application runs directly in the browser with zero server require
 ## What It Does
 
 - **89 Indian Airports:** Complete directory from metro hubs (Delhi, Mumbai, Bengaluru) to regional and island airports (Ayodhya, Itanagar, Port Blair, Agatti Island) with exact distance and duration math.
+- **🗺️ Interactive Live Route Radar:** Interactive dark CartoDB flight radar powered by Leaflet.js, mapping Great-Circle geodesic aerial trajectories and all 89 pan-India airport nodes.
 - **Real-Time Fair Value Benchmark:** Evaluates flights against an ensemble ML model ($R^2 = 96.8\%$) to flag whether a fare is a **Great Deal**, **Fair Price**, or **Surge Inflated**.
-- **Buy vs. Wait Decision Advisor:** Calculates a price drop probability based on your travel date and days remaining before departure.
-- **30-Day Fare Calendar:** An interactive chart that maps out daily minimum airfares over the upcoming month to help spot cheaper travel windows.
-- **Hourly Price Dynamics:** Visualizes how flight prices vary across departure times (early morning, peak morning, afternoon saver, evening, and red-eye).
+- **🔄 Round-Trip & Return Combo Mode:** Toggle between One-Way and Round-Trip itineraries with synchronized return dates and automated 5% round-trip bundle discounts.
+- **📌 Saved Route Watchlist & Price Alerts:** Persistent browser-based route tracking with a slide-over modal drawer, price drop/surge alerts, and quick-load shortcuts.
+- **🌿 Eco-Score & Carbon Estimator:** Route emissions modeling showing per-passenger CO₂ footprint and highlighting next-gen fuel-efficient aircraft (A320neo, Boeing 737 MAX 8).
+- **🔗 Real Airline Deep-Links:** Instant one-click links to official airline booking portals (IndiGo, Air India, Akasa Air, SpiceJet) and live Google Flights seat availability.
+- **💡 Buy vs. Wait Decision Advisor:** Calculates a price drop probability based on your travel date and days remaining before departure.
+- **📅 30-Day Fare Calendar & Hourly Dynamics:** Interactive Chart.js graphs mapping upcoming daily minimum airfares and departure bank price elasticity.
 - **Type-Ahead Search:** A fast search box with keyboard navigation that lets you quickly search by city, airport name, or 3-letter IATA code (e.g., `DEL`, `BOM`, `AYJ`).
+
 
 ---
 
