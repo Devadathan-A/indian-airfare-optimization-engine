@@ -1,0 +1,62 @@
+{
+  "model_version": "2024-2026.1-RealTime",
+  "market_year": "2024-2026 Current Domestic Aviation",
+  "champion_r2": 0.9679,
+  "champion_rmse": 4798.17,
+  "models": {
+    "HistGradientBoosting (Log)": {
+      "r2": 0.9625,
+      "rmse": 5187.67
+    },
+    "Decision Tree": {
+      "r2": 0.9734,
+      "rmse": 4366.48
+    },
+    "Champion Ensemble": {
+      "r2": 0.9679,
+      "rmse": 4798.17
+    }
+  },
+  "total_records_trained": 296204,
+  "features_count": 23,
+  "airlines": [
+    "Air India",
+    "Air India Express",
+    "Akasa Air",
+    "IndiGo",
+    "SpiceJet",
+    "Vistara"
+  ],
+  "source_cities": [
+    "BANGALORE",
+    "CHENNAI",
+    "DELHI",
+    "HYDERABAD",
+    "KOLKATA",
+    "MUMBAI"
+  ],
+  "destination_cities": [
+    "BANGALORE",
+    "CHENNAI",
+    "DELHI",
+    "HYDERABAD",
+    "KOLKATA",
+    "MUMBAI"
+  ],
+  "departure_times": [
+    "Afternoon",
+    "Early_Morning",
+    "Evening",
+    "Morning",
+    "Night"
+  ],
+  "classes": [
+    "Business",
+    "Economy"
+  ],
+  "numerical_cols": [
+    "stops",
+    "duration",
+    "days_left"
+  ]
+}

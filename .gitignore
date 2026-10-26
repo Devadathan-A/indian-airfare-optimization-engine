@@ -1,0 +1,30 @@
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Generated model artifacts
+*.joblib
+*.pkl
+!models/*.pkl
+
+# Generated intermediate datasets
+Merged_Flights.csv
+cleaned_merged_flight_data.csv
+
+# Generated plots from notebook runs
+price_distribution_before.png
+stops_inconsistency_before.png
+city_inconsistency_before
+airline_inconsistency_before.png
+airline_verification.png
+geographical_network.png
+layover_distributions.png
+
+# Editor / OS files
+.vscode/
+.DS_Store
+Thumbs.db

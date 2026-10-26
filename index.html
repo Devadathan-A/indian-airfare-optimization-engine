@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroPulse India - Pan-India Real-Time Airfare Engine</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Chart.js for interactive analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Navbar -->
+        <header class="navbar">
+            <div class="nav-brand">
+                <span class="brand-icon">✈️</span>
+                <span class="brand-text">AeroPulse India</span>
+                <span class="brand-sub">• Pan-India Flight Engine</span>
+            </div>
+            <div class="nav-status">
+                <span class="status-badge">
+                    <span class="status-dot"></span> Live Market Feed (DGCA 2026)
+                </span>
+                <span class="airport-count-badge" id="airportCountBadge">89 Airports</span>
+                <span class="date-badge" id="currentDateBadge"></span>
+            </div>
+        </header>
+
+        <!-- Search Card -->
+        <section class="search-card">
+            <div class="card-title">🔍 Search Any Domestic Flight in India (Metros, Regional & Islands)</div>
+
+            <!-- Popular Route Presets -->
+            <div class="popular-routes-row">
+                <span class="presets-label">POPULAR ROUTES:</span>
+                <button type="button" class="preset-btn" onclick="selectPreset('DEL', 'BOM')">Delhi ⇄ Mumbai</button>
+                <button type="button" class="preset-btn" onclick="selectPreset('BLR', 'DEL')">Bangalore ⇄ Delhi</button>
+                <button type="button" class="preset-btn" onclick="selectPreset('AYJ', 'BOM')">Ayodhya ⇄ Mumbai</button>
+                <button type="button" class="preset-btn" onclick="selectPreset('BOM', 'GOI')">Mumbai ⇄ Goa</button>
+                <button type="button" class="preset-btn" onclick="selectPreset('DEL', 'IXZ')">Delhi ⇄ Port Blair</button>
+            </div>
+
+            <!-- Search Inputs Grid -->
+            <form id="searchForm" onsubmit="event.preventDefault(); executeSearch();">
+                <div class="search-inputs-grid">
+                    <div class="form-group combobox-group" id="originComboboxGroup">
+                        <label for="originInput">Departure Airport (Origin)</label>
+                        <div class="combobox-wrapper">
+                            <span class="combobox-icon">🛫</span>
+                            <input type="text" 
+                                   id="originInput" 
+                                   class="form-control combobox-input" 
+                                   placeholder="Type city or airport (e.g. DEL, Delhi)..." 
+                                   autocomplete="off" 
+                                   spellcheck="false">
+                            <button type="button" class="combobox-clear-btn" id="originClearBtn" title="Clear input" style="display: none;">×</button>
+                            <button type="button" class="combobox-toggle-btn" id="originToggleBtn" title="Show all airports">▾</button>
+                            <input type="hidden" id="originSelect" value="DEL">
+                        </div>
+                        <div class="combobox-dropdown" id="originDropdown" style="display: none;">
+                            <div class="combobox-list" id="originList"></div>
+                        </div>
+                    </div>
+
+                    <div class="swap-col">
+                        <button type="button" class="swap-btn" onclick="swapAirports()" title="Swap airports">⇄</button>
+                    </div>
+
+                    <div class="form-group combobox-group" id="destComboboxGroup">
+                        <label for="destInput">Arrival Airport (Destination)</label>
+                        <div class="combobox-wrapper">
+                            <span class="combobox-icon">🛬</span>
+                            <input type="text" 
+                                   id="destInput" 
+                                   class="form-control combobox-input" 
+                                   placeholder="Type city or airport (e.g. BOM, Mumbai)..." 
+                                   autocomplete="off" 
+                                   spellcheck="false">
+                            <button type="button" class="combobox-clear-btn" id="destClearBtn" title="Clear input" style="display: none;">×</button>
+                            <button type="button" class="combobox-toggle-btn" id="destToggleBtn" title="Show all airports">▾</button>
+                            <input type="hidden" id="destSelect" value="BOM">
+                        </div>
+                        <div class="combobox-dropdown" id="destDropdown" style="display: none;">
+                            <div class="combobox-list" id="destList"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="travelDateInput">Travel Date</label>
+                        <input type="date" id="travelDateInput" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="classSelect">Cabin Class</label>
+                        <select id="classSelect" class="form-control">
+                            <option value="Economy">Economy</option>
+                            <option value="Business">Business</option>
+                        </select>
+                    </div>
+
+                    <div class="search-btn-col">
+                        <button type="submit" class="primary-search-btn">Search Flights</button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Quick Date Chips -->
+            <div class="quick-dates-row">
+                <span class="presets-label">QUICK DATES:</span>
+                <button type="button" class="date-chip" onclick="setQuickDate(0)">Today (Urgent)</button>
+                <button type="button" class="date-chip" onclick="setQuickDate(1)">Tomorrow</button>
+                <button type="button" class="date-chip" onclick="setQuickDate('weekend')">This Weekend</button>
+                <button type="button" class="date-chip" onclick="setQuickDate(14)">+14 Days (Prime)</button>
+                <button type="button" class="date-chip" onclick="setQuickDate(30)">+30 Days (Early-Bird)</button>
+            </div>
+        </section>
+
+        <!-- Top 3 Summary Highlight Cards -->
+        <section class="summary-grid">
+            <div class="summary-card cheapest">
+                <div class="summary-label">🏷️ LOWEST AVAILABLE FARE</div>
+                <div class="summary-value green-text" id="summaryCheapestPrice">₹--</div>
+                <div class="summary-sub" id="summaryCheapestSub">Loading flight data...</div>
+            </div>
+
+            <div class="summary-card fastest">
+                <div class="summary-label" id="summaryFastestLabel">⚡ FASTEST FLIGHT</div>
+                <div class="summary-value blue-text" id="summaryFastestDuration">--h --m</div>
+                <div class="summary-sub" id="summaryFastestSub">Calculating distance & duration...</div>
+            </div>
+
+            <div class="summary-card advice">
+                <div class="summary-label">💡 SMART AI BOOKING ADVICE</div>
+                <div class="summary-value" id="summaryAdviceAction" style="font-size: 1.35rem;">Analyzing...</div>
+                <div class="summary-sub" id="summaryAdviceSub">Evaluating route price elasticity...</div>
+            </div>
+        </section>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs-nav">
+            <button class="tab-btn active" onclick="switchTab('flights')">✈️ Available Flights (<span id="flightsTabCount">0</span>)</button>
+            <button class="tab-btn" onclick="switchTab('calendar')">📅 30-Day Best Fare Calendar</button>
+            <button class="tab-btn" onclick="switchTab('hours')">⏰ Best Time of Day to Fly</button>
+            <button class="tab-btn" onclick="switchTab('airports')">🇮🇳 All 89 Airports Directory</button>
+            <button class="tab-btn" onclick="switchTab('ai')">🧠 AI Engine & Accuracy (96.8%)</button>
+        </nav>
+
+        <!-- TAB 1: FLIGHT RESULTS -->
+        <main id="tab-flights" class="tab-content active">
+            <!-- Filter Bar -->
+            <div class="filters-bar">
+                <div class="filter-group">
+                    <label>Filter Carrier:</label>
+                    <select id="carrierFilter" class="filter-select" onchange="applyFilters()">
+                        <option value="All">All Airlines</option>
+                        <option value="IndiGo">IndiGo</option>
+                        <option value="Air India">Air India</option>
+                        <option value="Akasa Air">Akasa Air</option>
+                        <option value="Vistara">Vistara</option>
+                        <option value="Air India Express">Air India Express</option>
+                        <option value="SpiceJet">SpiceJet</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Layovers / Stops:</label>
+                    <select id="stopsFilter" class="filter-select" onchange="applyFilters()">
+                        <option value="All">All Flights</option>
+                        <option value="Direct">Direct (Non-stop) Only</option>
+                        <option value="1Stop">1 Stop Only</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Sort Results By:</label>
+                    <select id="sortFilter" class="filter-select" onchange="applyFilters()">
+                        <option value="price">Cheapest First</option>
+                        <option value="deal">Best AI Deal (Greatest Savings)</option>
+                        <option value="duration">Fastest Duration</option>
+                        <option value="departure">Earliest Departure</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="route-header-info" id="routeHeaderInfo">
+                Showing flights...
+            </div>
+
+            <!-- Flight Cards Container -->
+            <div id="flightCardsContainer" class="flight-cards-list"></div>
+        </main>
+
+        <!-- TAB 2: 30-DAY FARE CALENDAR -->
+        <section id="tab-calendar" class="tab-content">
+            <div class="section-title">📅 Lowest Fare Finder (Next 30 Days)</div>
+            <div class="section-desc">Interactive forward-looking forecast of the lowest available fare on this corridor across the next month:</div>
+            <div class="chart-container">
+                <canvas id="calendarChart"></canvas>
+            </div>
+            <div class="insight-box" id="calendarInsightBox">
+                💡 <b>Tip:</b> Compare daily rates to lock in optimal savings.
+            </div>
+        </section>
+
+        <!-- TAB 3: HOURLY TIME-OF-DAY DYNAMICS -->
+        <section id="tab-hours" class="tab-content">
+            <div class="section-title">⏰ Average Airfare by Departure Time Slot</div>
+            <div class="section-desc">How flight departure timing influences ticket prices due to corporate travel schedules:</div>
+            <div class="chart-container">
+                <canvas id="hoursChart"></canvas>
+            </div>
+            <div class="insight-box">
+                💡 <b>Savings Tip:</b> Afternoon flights (12:00 PM – 5:00 PM) are consistently 10% to 18% cheaper than early morning and evening flights preferred by corporate commuters.
+            </div>
+        </section>
+
+        <!-- TAB 4: 89 AIRPORTS DIRECTORY -->
+        <section id="tab-airports" class="tab-content">
+            <div class="section-title">🇮🇳 Pan-India Operational Commercial Airports Directory (89 Hubs)</div>
+            <div class="section-desc">Searchable list of all commercial airports supported across all Indian States and Union Territories:</div>
+            <div class="table-search-row">
+                <input type="text" id="airportSearchInput" class="form-control" placeholder="Search by city, airport name, state, or IATA code..." onkeyup="filterAirportsTable()">
+            </div>
+            <div class="table-container">
+                <table class="data-table" id="airportsTable">
+                    <thead>
+                        <tr>
+                            <th>IATA Code</th>
+                            <th>City</th>
+                            <th>Airport Name</th>
+                            <th>State / Union Territory</th>
+                            <th>Classification</th>
+                        </tr>
+                    </thead>
+                    <tbody id="airportsTableBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- TAB 5: AI ENGINE & ACCURACY -->
+        <section id="tab-ai" class="tab-content">
+            <div class="section-title">🧠 Machine Learning Architecture & Benchmark (2024-2026 Engine)</div>
+            <div class="section-desc">Technical breakdown of model training, feature vectors, and evaluation metrics:</div>
+
+            <div class="two-col-grid">
+                <div class="info-card">
+                    <h3>🏆 Model Evaluation Table</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Model Architecture</th>
+                                <th>R² Accuracy</th>
+                                <th>RMSE (₹)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Linear Regression (Baseline)</td>
+                                <td>82.48%</td>
+                                <td>₹8,939</td>
+                                <td>Baseline</td>
+                            </tr>
+                            <tr>
+                                <td>HistGradientBoosting (Log)</td>
+                                <td>96.25%</td>
+                                <td>₹5,187</td>
+                                <td>Core Regressor</td>
+                            </tr>
+                            <tr>
+                                <td>Decision Tree Regressor</td>
+                                <td>97.34%</td>
+                                <td>₹4,366</td>
+                                <td>Sub-component</td>
+                            </tr>
+                            <tr class="highlight-row">
+                                <td><b>Champion Weighted Ensemble</b></td>
+                                <td><b>96.79%</b></td>
+                                <td><b>₹4,798</b></td>
+                                <td><b>Production Deployed</b></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="info-card">
+                    <h3>🔬 Dataset & Engineering Specifications</h3>
+                    <ul class="specs-list">
+                        <li><b>Trained Flight Records:</b> 296,204 validated domestic flights across India.</li>
+                        <li><b>Market Calibration:</b> Calibrated against 2024–2026 DGCA domestic tariff bands and ATF aviation fuel revisions.</li>
+                        <li><b>Active Airlines:</b> IndiGo (6E), Air India (AI), Akasa Air (QP), Vistara (UK), Air India Express (IX), SpiceJet (SG).</li>
+                        <li><b>Route Physics:</b> Exact Haversine geodesic distance & cruising duration for all 89 commercial airports.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div>AeroPulse India • Pan-India Commercial Airfare Optimization Engine</div>
+            <div class="footer-sub">Zero-Dependency Pure Web Architecture • GitHub Pages & Local Ready • Developed for AI/ML Capstone</div>
+        </footer>
+    </div>
+
+    <!-- Main Logic Script -->
+    <script src="app.js"></script>
+</body>
+</html>
